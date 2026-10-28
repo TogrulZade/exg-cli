@@ -1,0 +1,26 @@
+{
+  "name": "@togrulzade/exg",
+  "version": "1.0.0",
+  "description": "Laravel-inspired Express.js MVC project generator",
+  "type": "module",
+  "bin": {
+    "exg": "./index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.7.0",
+    "giget": "^3.3.1",
+    "picocolors": "^1.1.1"
+  }
+}

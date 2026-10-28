@@ -170,7 +170,7 @@ Node.js 22+ tələb olunur; lokal şablon seçimi üçün Git də lazımdır.`);
     await createProject({ ...options, name, orm });
     spinner.stop(pc.green('Layihə uğurla yaradıldı!'));
     const dbSteps = orm === 'prisma'
-      ? 'npm run db:migrate -- --name init'
+      ? 'npm run db:generate\nnpm run db:deploy'
       : orm === 'sequelize' ? 'npm run db:migrate' : '# MongoDB serverinin işlədiyini yoxla';
     p.note(`cd ${name}\nnpm install\n# .env içində baza bağlantısını tənzimlə\n${dbSteps}\nnpm run dev`, 'Başlamaq üçün');
     p.outro(pc.cyan('Daha ətraflı: yaradılan layihənin README.md faylı.'));

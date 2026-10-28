@@ -48,7 +48,8 @@ cd my-api
 npm install
 # .env içində database bağlantısını dəyiş
 # PostgreSQL bazasını yarat və serverinin işlədiyini yoxla
-npm run db:migrate -- --name init
+npm run db:generate
+npm run db:deploy
 npm run dev
 ```
 

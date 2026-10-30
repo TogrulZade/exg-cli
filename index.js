@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { makeController, parseControllerArgs } from './src/make-controller.js';
+import { makeService, parseServiceArgs } from './src/make-service.js';
 import { databaseConfig, promptDatabase, configureNewDatabase, databaseSteps } from './src/database.js';
 
 const execFileAsync = promisify(execFile);
@@ -156,6 +157,20 @@ Home adı da HomeController kimi qəbul edilir. Mövcud faylların üzərinə ya
     p.log.info('index metodu hazırda 501 qaytarır; TODO hissəsinə öz məntiqini əlavə et.');
     return;
   }
+  if (args[0] === 'make:service') {
+    const options = parseServiceArgs(args.slice(1));
+    if (options.help) {
+      console.log(`İstifadə: exg make:service UserService [--project ./my-api]
+
+src/services daxilində static metodlu service class-ı yaradır.
+User adı da UserService kimi qəbul edilir. Mövcud faylların üzərinə yazılmır.`);
+      return;
+    }
+    const result = await makeService(options);
+    p.log.success(result.file);
+    p.log.info(`Controller-də istifadə: import { ${result.service} } from '../services/${result.service}.js';`);
+    return;
+  }
   const options = parseArgs(args);
   if (options.help) {
     console.log(`EXG — Express MVC Generator
@@ -169,6 +184,7 @@ Home adı da HomeController kimi qəbul edilir. Mövcud faylların üzərinə ya
   exg my-api --orm mongoose --template ../express-mvc-starter
   exg make:controller HomeController
   exg make:controller HomeController --project ./my-api
+  exg make:service UserService
 
 Seçimlər:
   --orm prisma|sequelize|mongoose

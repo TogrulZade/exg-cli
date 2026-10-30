@@ -35,7 +35,7 @@ export function controllerNames(name) {
   return { controller: `${stem}Controller`, variable, routeFile: `${variable}.js`, mount: `/${words}` };
 }
 
-async function projectRoot(cwd, project) {
+export async function projectRoot(cwd, project) {
   let current = path.resolve(cwd, project || '.');
   while (true) {
     let pkg;
@@ -58,7 +58,7 @@ async function projectRoot(cwd, project) {
   }
 }
 
-async function directory(dir) {
+export async function directory(dir) {
   const stat = await fs.lstat(dir);
   if (!stat.isDirectory() || stat.isSymbolicLink()) {
     throw new Error(`Adi layihə qovluğu olmalıdır: ${dir}`);

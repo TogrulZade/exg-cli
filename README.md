@@ -137,6 +137,45 @@ Mövcud faylların üzərinə yazılmır; eyni route yolu və import adı təkra
 
 Yalnız fayl yaradırsan, database əməliyyatı və migration işləmir. Lokal `npm link` istifadə edirsənsə yeni əmr dərhal əlçatandır.
 
+## Service yaratmaq
+
+Biznes məntiqini (database sorğuları, hesablamalar, cache) controller-dən ayırmaq üçün:
+
+```bash
+exg make:service UserService
+# və ya: exg make:service User --project ./my-api
+```
+
+`src/services/UserService.js` yaranır. `src/services` qovluğu yoxdursa yaradılır, mövcud faylın üzərinə yazılmır:
+
+```js
+export class UserService {
+  static async all() {
+    // TODO: Bu metodun məntiqini yaz.
+    return [];
+  }
+}
+```
+
+Controller-də istifadəsi:
+
+```js
+import { UserService } from '../services/UserService.js';
+
+export class UserController {
+  static async index(req, res, next) {
+    try {
+      const users = await UserService.all();
+      res.json({ success: true, data: users });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+```
+
+Controller yalnız sorğunu oxuyur və cavab qaytarır; data ilə iş service-də olur. Belə olduqda eyni məntiqi başqa controller-dən, admin paneldən və ya testdən də çağırmaq olur.
+
 ## GitHub və npm-dən quraşdırma
 
 GitHub-dan quraşdırmaq üçün:

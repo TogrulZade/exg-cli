@@ -17,7 +17,7 @@ exg --help
 
 ## İstifadə
 
-GitHub-da `togrulzade/express-mvc-starter` repozitoriyası və onun üç branch-i yayımlandıqdan sonra:
+Yeni layihə yaratmaq üçün:
 
 ```bash
 exg
@@ -26,6 +26,8 @@ exg my-api --orm prisma
 exg another-api --orm sequelize
 exg mongo-api --orm mongoose
 ```
+
+Terminalda layihə adından və ORM seçimindən sonra database sualları gəlir. `--orm prisma` versən, yalnız ORM sualı keçilir; baza məlumatları yenə soruşulur.
 
 Ad kiçik latın hərfi və ya rəqəmlə başlamalıdır. Yalnız `a-z`, `0-9`, `-` istifadə et. Mövcud qovluq, fayl və ya simvolik link üzərinə yazılmır.
 
@@ -39,21 +41,70 @@ exg mongo-api --orm mongoose --template ./express-mvc-starter
 
 Lokal seçim seçilmiş branch-in son commit-ini götürür. Şablondakı commit olunmamış dəyişikliklər, `.env`, `node_modules` və Git tarixçəsi yeni layihəyə köçürülmür. Şablonun hazırda açıq branch-i dəyişmir. Şablonda gizli faylları heç vaxt commit etmə.
 
-Generator `package.json` və mövcuddursa `package-lock.json` içində ad və versiyanı dəyişir. Versiya `0.1.0`, layihə isə `private: true` olur. `.env.example` faylı `.env` olaraq kopyalanır. Paketlər avtomatik quraşdırılmır, database yaradılmır və server başlamır.
+Generator `package.json` və mövcuddursa `package-lock.json` içində ad və versiyanı dəyişir. Versiya `0.1.0`, layihə isə `private: true` olur. Seçdiyin bağlantı `.env`-ə yazılır. Sequelize driver-i dəyişəndə npm vasitəsilə lock faylı yenilənir; bunun üçün registry bağlantısı lazımdır. Paketlər hələ quraşdırılmır, database yaradılmır və server başlamır.
+
+## Database seçimi və bağlantı
+
+Məsələn, MySQL ilə Prisma layihəsi:
+
+```bash
+exg shop-api --orm prisma --database mysql
+```
+
+Suallarda Enter bassan bu dəyərlər götürülür. Host, port, istifadəçi, şifrə və baza adını özün dəyişə bilərsən.
+
+| Database | Hansı ORM-də? | Host | Port | İstifadəçi | Şifrə |
+| --- | --- | --- | --- | --- | --- |
+| PostgreSQL | Prisma, Sequelize | localhost | 5432 | postgres | boş |
+| MySQL | Prisma, Sequelize | localhost | 3306 | root | boş |
+| MariaDB | Prisma, Sequelize | localhost | 3306 | root | boş |
+| SQLite | Prisma, Sequelize | lazım deyil | lazım deyil | lazım deyil | lazım deyil |
+| MongoDB | Mongoose | localhost | 27017 | boş | boş |
+
+**Boş şifrə serverinin həqiqi şifrəsi demək deyil.** EXG serverində istifadəçi və şifrə yaratmır. MySQL-də `root` üçün hansı şifrəni qoymusansa, sualda onu yaz. PostgreSQL-də adətən istifadəçi `postgres` olur; bu dəyəri də dəyişmək olar.
+
+Baza adı layihə adından götürülür: `shop-api` → `shop_api` (maksimum 63 simvol). SQLite üçün başlanğıc fayl `./shop_api.db` olur. Prisma-da bu yol `prisma/` qovluğuna, Sequelize-də layihənin kökünə nəzərəndir. Fayl adını və alt qovluğunu dəyişmək olar, məsələn `./data/dev.db`. SQLite üçün ayrıca server və şifrə soruşulmur.
+
+Şifrə gizli daxil edilir. URL-də problem yaradan `@`, `#`, `:`, `$` kimi simvollar generator tərəfindən kodlaşdırılır. Şəxsi bağlantın yalnız `.env`-ə yazılır; `.env.example` lokal və şifrəsiz nümunə saxlayır. `.env` Git-ə daxil edilmir.
+
+MongoDB-də istifadəçini boş saxlasan, şifrəsiz lokal bağlantı hazırlanır. İstifadəçi yazsan, şifrə və `authSource` da soruşulur. `authSource` istifadəçinin yaradıldığı bazadır, başlanğıc dəyəri `admin`-dir.
+
+Parametrləri birbaşa da verə bilərsən:
+
+```bash
+# Portu və istifadəçini dəyiş; çatışmayan məlumatlar soruşulacaq
+exg shop-api --orm prisma --database mysql --db-port 3307 --db-user app_user
+
+# Bütün sualları keç; şifrə boş, qalan sahələr standart olsun
+exg local-api --orm prisma --database sqlite --yes
+
+# PostgreSQL bağlantısının parametrləri
+exg report-api --orm sequelize --database postgresql \
+  --db-host localhost --db-port 5433 --db-user postgres --db-name reports --yes
+```
+
+`--yes` (`-y`) verilsə, çatışmayan sahələr üçün başlanğıc dəyərlər istifadə olunur; ORM verilməyibsə Prisma seçilir. Layihə adı yenə lazımdır. İnteraktiv terminal olmayan mühitdə layihə adı və ORM verilməlidir; baza sahələri soruşulmadan başlanğıc dəyərlərini alır. Avtomatlaşdırmada şifrəni secret/env vasitəsilə `EXG_DB_PASSWORD` dəyişəninə ver. Şifrəni əmr tarixçəsinə salmamaq üçün `--db-password` parametri yoxdur.
+
+Bu quraşdırma **yeni layihə yaradılarkən** edilir. Mövcud layihədə host, port, istifadəçi və şifrəni `.env`-də dəyiş. Baza növünü sonradan dəyişmək üçün ORM schema-sı, driver və migration-lar da uyğunlaşdırılmalıdır.
+
+Prisma üçün həm `schema.prisma` provider-i, həm ilkin `User` migration-ı, həm də `migration_lock.toml` seçilmiş bazaya uyğun hazırlanır. MariaDB Prisma-nın `mysql` provider-indən istifadə edir. Hazır SQL faylları Prisma 5.22 `migrate diff` ilə yaradılıb. Xüsusi model və migration-ları olan lokal Prisma şablonunun başqa provider-ə çevrilməsi qəbul edilmir; generator məlumatı səssiz itirməmək üçün xəta verir.
+
+Sequelize üçün runtime bağlantısı və `database/config.cjs` eyni dialekti istifadə edir. Müvafiq paket (`pg`, `mysql2`, `mariadb` və ya `sqlite3`) və lock faylı hazırlanır. SQLite faylları `.gitignore`-a əlavə olunur.
+
+Prisma 5-də SQLite migration-ından əvvəl baza faylı mövcud olmalıdır. Generator `scripts/prepare-sqlite.js` və `predb:migrate` / `predb:deploy` npm hook-larını əlavə edir. Aşağıdakı npm əmrləri çatışmayan qovluğu və faylı hazırlayır; mövcud baza silinmir. Bu, layihəni sonradan Git-dən götürəndə də işləyir.
 
 Layihə yaranandan sonra:
 
 ```bash
 cd my-api
 npm install
-# .env içində database bağlantısını dəyiş
-# PostgreSQL bazasını yarat və serverinin işlədiyini yoxla
+# .env hazırdır; server bazası seçmisənsə, əvvəl onu yarat və serverini başlat
 npm run db:generate
 npm run db:deploy
 npm run dev
 ```
 
-Bu əmrlər Prisma üçündür. Sequelize üçün `npm run db:migrate`, Mongoose üçün isə işləyən MongoDB serveri lazımdır. Hər şablonun README faylında uyğun addımlar var.
+Bu əmrlər Prisma üçündür. Sequelize üçün `npm run db:migrate`, Mongoose üçün isə işləyən MongoDB serveri lazımdır. Hər yaradılan layihənin `DATABASE.md` faylında seçdiyin bazaya uyğun addımlar var.
 
 Şəbəkə və ya şablon hazırlama xətası olduqda hədəf layihə qovluğu yaradılmır. Son fayl köçürülməsi zamanı disk xətası olarsa qismən qovluq qala bilər; CLI xəta verir və mövcud məlumatları avtomatik silmir.
 
@@ -88,7 +139,7 @@ Yalnız fayl yaradırsan, database əməliyyatı və migration işləmir. Lokal 
 
 ## GitHub və npm-dən quraşdırma
 
-Bunlar repozitoriya və paket yayımlandıqdan sonra işləyəcək:
+GitHub-dan quraşdırmaq üçün:
 
 ```bash
 npm i -g github:togrulzade/exg-cli
@@ -96,7 +147,7 @@ npm i -g github:togrulzade/exg-cli
 npm i -g @togrulzade/exg
 ```
 
-`togrulzade` bu kompüterdəki Git adından çıxarılıb; GitHub və npm hesablarına sahiblik yoxlanmayıb. Yayımlamadan əvvəl lazım olsa `package.json` içində scope-u, `index.js` içində `GITHUB_REPO` dəyərini və README ünvanlarını öz hesabına uyğunlaşdır.
+GitHub repozitoriyası: [TogrulZade/exg-cli](https://github.com/TogrulZade/exg-cli). npm-dən quraşdırma yalnız paket npm-ə dərc edilibsə işləyir.
 
 ## Yoxlama
 
@@ -108,4 +159,4 @@ npm pack --dry-run
 
 Testlər GitHub-a çıxmadan branch seçimini, yaradılan faylları, lokal Git şablonunu, yanlış adları, mövcud qovluğun qorunmasını və xəta hallarını yoxlayır. `giget` GitHub yükləməsi üçün istifadə olunur. Köhnə 1.x versiyasındakı `tar` asılılığının məlum boşluqlarına görə 3.x seçilib.
 
-API mənbəyi: [giget rəsmi repozitoriyası](https://github.com/unjs/giget).
+API mənbələri: [giget](https://github.com/unjs/giget), [Prisma bağlantı URL-ləri](https://www.prisma.io/docs/orm/reference/connection-urls), [Sequelize driver-ləri](https://sequelize.org/docs/v6/getting-started/).

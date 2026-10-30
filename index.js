@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { makeController, parseControllerArgs } from './src/make-controller.js';
+import { databaseConfig, promptDatabase, configureNewDatabase, databaseSteps } from './src/database.js';
 
 const execFileAsync = promisify(execFile);
 export const GITHUB_REPO = 'togrulzade/express-mvc-starter';
@@ -27,9 +28,20 @@ export function validateName(value) {
 
 export function parseArgs(args) {
   const options = {};
+  const dbFlags = { '--database': 'database', '--db-host': 'host', '--db-port': 'port', '--db-user': 'user', '--db-name': 'name', '--db-file': 'file', '--db-auth-source': 'authSource' };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--help' || arg === '-h') options.help = true;
+    else if (arg === '--yes' || arg === '-y') options.yes = true;
+    else if (arg.startsWith('--db-password')) throw new Error('Şifrəni interaktiv daxil et və ya EXG_DB_PASSWORD mühit dəyişənini istifadə et.');
+    else if (Object.hasOwn(dbFlags, arg)) {
+      const value = args[++i];
+      if (value === undefined || value.startsWith('--')) throw new Error(`${arg} üçün dəyər lazımdır.`);
+      options.database ??= {};
+      const key = dbFlags[arg];
+      if (Object.hasOwn(options.database, key)) throw new Error(`${arg} yalnız bir dəfə istifadə oluna bilər.`);
+      options.database[key] = value;
+    }
     else if (arg === '--orm' || arg === '--template') {
       const value = args[++i];
       if (!value || value.startsWith('--')) throw new Error(`${arg} üçün dəyər lazımdır.`);
@@ -44,6 +56,8 @@ export function parseArgs(args) {
   if (options.orm && !Object.hasOwn(BRANCHES, options.orm)) {
     throw new Error('--orm prisma, sequelize və ya mongoose olmalıdır.');
   }
+  if (options.yes && !options.orm) options.orm = 'prisma';
+  if (options.orm && options.database) databaseConfig(options.orm, options.name, options.database);
   return options;
 }
 
@@ -68,10 +82,11 @@ async function requireFile(file) {
   if (!stat.isFile()) throw new Error(`Şablonda adi fayl olmalıdır: ${path.basename(file)}`);
 }
 
-export async function createProject({ name, orm, cwd = process.cwd(), templateDirectory }, downloader = downloadTemplate) {
+export async function createProject({ name, orm, cwd = process.cwd(), templateDirectory, database }, downloader = downloadTemplate) {
   const nameError = validateName(name);
   if (nameError) throw new Error(nameError);
   if (!Object.hasOwn(BRANCHES, orm)) throw new Error('Düzgün ORM seç: prisma, sequelize, mongoose.');
+  if (database) database = databaseConfig(orm, name, database);
   const targetDir = path.resolve(cwd, name);
   await ensureAbsent(targetDir);
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'exg-'));
@@ -112,7 +127,8 @@ export async function createProject({ name, orm, cwd = process.cwd(), templateDi
       if (error.code !== 'ENOENT') throw error;
     }
 
-    await fs.copyFile(envExample, path.join(stage, '.env'), fs.constants.COPYFILE_EXCL);
+    if (database) await configureNewDatabase(stage, orm, name, database);
+    else await fs.copyFile(envExample, path.join(stage, '.env'), fs.constants.COPYFILE_EXCL);
     // Exclusive mkdir also guards against a target created during download.
     await fs.mkdir(targetDir);
     for (const entry of await fs.readdir(stage)) {
@@ -146,22 +162,35 @@ Home adı da HomeController kimi qəbul edilir. Mövcud faylların üzərinə ya
 
 İstifadə:
   exg                           İnteraktiv seçim
-  exg my-api                    ORM-i interaktiv seç
-  exg my-api --orm prisma        Sual vermədən yarat
+  exg my-api                    ORM və database-i interaktiv seç
+  exg my-api --orm prisma        Database bağlantısını interaktiv qur
+  exg my-api --orm prisma --database mysql
+  exg local-api --database sqlite --yes
   exg my-api --orm mongoose --template ../express-mvc-starter
   exg make:controller HomeController
   exg make:controller HomeController --project ./my-api
 
 Seçimlər:
   --orm prisma|sequelize|mongoose
+  --database postgresql|mysql|mariadb|sqlite|mongodb
+  --db-host HOST     Default: localhost
+  --db-port PORT     Seçilmiş bazanın standart portu
+  --db-user USER     MySQL/MariaDB: root; PostgreSQL: postgres
+  --db-name NAME     Default: layihə adı (- əvəzinə _)
+  --db-file PATH     SQLite üçün nisbi .db yolu
+  --db-auth-source NAME  MongoDB istifadəçisinin bazası (default: admin)
+  --yes, -y          Sualları keç, verilməyən dəyərləri default götür
   --template PATH    Lokal Git şablonundan seçilmiş branch-i götür
   --help, -h         Bu köməyi göstər
 
+Şifrə gizli soruşulur; default boşdur. Avtomatlaşdırma: EXG_DB_PASSWORD.
+TTY olmayan mühitdə ad və ORM verildikdə suallar default ilə keçilir.
 GitHub şablonu: ${GITHUB_REPO}
 Node.js 22+ tələb olunur; lokal şablon seçimi üçün Git də lazımdır.`);
     return;
   }
-  if ((!options.name || !options.orm) && (!process.stdin.isTTY || !process.stdout.isTTY)) {
+  const interactive = !options.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  if ((!options.name || !options.orm) && !interactive) {
     throw new Error('İnteraktiv terminal yoxdur. Məsələn: exg my-api --orm prisma');
   }
 
@@ -181,17 +210,18 @@ Node.js 22+ tələb olunur; lokal şablon seçimi üçün Git də lazımdır.`);
     ],
   });
   if (p.isCancel(orm)) return p.cancel('Əməliyyat ləğv edildi.');
+  const input = { ...options.database };
+  if (process.env.EXG_DB_PASSWORD !== undefined) input.password = process.env.EXG_DB_PASSWORD;
+  const database = await promptDatabase({ orm, name, input, interactive });
+  if (p.isCancel(database)) return p.cancel('Əməliyyat ləğv edildi.');
 
   const spinner = p.spinner();
   spinner.start(`Şablon hazırlanır (${BRANCHES[orm]})...`);
   try {
-    await createProject({ ...options, name, orm });
+    await createProject({ ...options, name, orm, database });
     spinner.stop(pc.green('Layihə uğurla yaradıldı!'));
-    const dbSteps = orm === 'prisma'
-      ? 'npm run db:generate\nnpm run db:deploy'
-      : orm === 'sequelize' ? 'npm run db:migrate' : '# MongoDB serverinin işlədiyini yoxla';
-    p.note(`cd ${name}\nnpm install\n# .env içində baza bağlantısını tənzimlə\n${dbSteps}\nnpm run dev`, 'Başlamaq üçün');
-    p.outro(pc.cyan('Daha ətraflı: yaradılan layihənin README.md faylı.'));
+    p.note(`cd ${name}\nnpm install\n# .env hazırdır. Server bazası seçmisənsə, onu əvvəl yarat.\n${databaseSteps(orm)}\nnpm run dev`, 'Başlamaq üçün');
+    p.outro(pc.cyan('Database addımları: yaradılan layihənin DATABASE.md faylı.'));
   } catch (error) {
     spinner.stop(pc.red('Layihə yaradıla bilmədi.'));
     throw error;

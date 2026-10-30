@@ -57,6 +57,35 @@ Bu əmrlər Prisma üçündür. Sequelize üçün `npm run db:migrate`, Mongoose
 
 Şəbəkə və ya şablon hazırlama xətası olduqda hədəf layihə qovluğu yaradılmır. Son fayl köçürülməsi zamanı disk xətası olarsa qismən qovluq qala bilər; CLI xəta verir və mövcud məlumatları avtomatik silmir.
 
+## Controller və router yaratmaq
+
+Yaratdığın Express layihəsinin içində:
+
+```bash
+cd my-api
+exg make:controller HomeController
+```
+
+Ana qovluqdan da işlədə bilərsən:
+
+```bash
+exg make:controller HomeController --project ./my-api
+```
+
+Əmr bunları hazırlayır:
+
+- `src/controllers/HomeController.js`: `static async index(req, res, next)` metodu.
+- `src/routes/homeRoutes.js`: `GET /` route-u controller-in `index` metoduna bağlıdır.
+- `src/routes/index.js`: router import edilir və `/home` yoluna qoşulur. Standart EXG tətbiqində ünvan `GET /api/home` olur.
+
+`index` daxilində TODO var və başlanğıcda `501 Not implemented` JSON cavabı verir; metodu boş saxlayıb sorğunu cavabsız qoymur. Həmin hissəyə öz kodunu yaz.
+
+`exg make:controller Home` də işləyir. `UserProfileController` üçün `userProfileRoutes.js` və `/user-profile` yaranır. Qovluqlu adlar (`Admin/HomeController`) dəstəklənmir.
+
+Mövcud faylların üzərinə yazılmır; eyni route yolu və import adı təkrar yaradılmır. Əmr ESM Express layihəsi və standart `Router()` + `export default router` quruluşu gözləyir. Standart quruluş tapılmazsa dəyişiklik etmədən xəta verir. Mövcud middleware və route sırası saxlanılır; yeni route default export-dan əvvəl qoşulur. Əsas router-də əvvəlcədən bütün yolları tutan 404/catch-all route varsa onun sırasını ayrıca nəzərə al.
+
+Yalnız fayl yaradırsan, database əməliyyatı və migration işləmir. Lokal `npm link` istifadə edirsənsə yeni əmr dərhal əlçatandır.
+
 ## GitHub və npm-dən quraşdırma
 
 Bunlar repozitoriya və paket yayımlandıqdan sonra işləyəcək:

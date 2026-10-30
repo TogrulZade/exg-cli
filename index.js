@@ -9,6 +9,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { makeController, parseControllerArgs } from './src/make-controller.js';
 
 const execFileAsync = promisify(execFile);
 export const GITHUB_REPO = 'togrulzade/express-mvc-starter';
@@ -124,6 +125,21 @@ export async function createProject({ name, orm, cwd = process.cwd(), templateDi
 }
 
 export async function main(args = process.argv.slice(2)) {
+  if (args[0] === 'make:controller') {
+    const options = parseControllerArgs(args.slice(1));
+    if (options.help) {
+      console.log(`İstifadə: exg make:controller HomeController [--project ./my-api]
+
+Controller-də index metodu, uyğun router və əsas router-də qeydiyyat yaradır.
+Home adı da HomeController kimi qəbul edilir. Mövcud faylların üzərinə yazılmır.`);
+      return;
+    }
+    const result = await makeController(options);
+    for (const file of result.files) p.log.success(file);
+    p.log.info(`Router yolu: ${result.mount} (standart EXG tətbiqində GET /api${result.mount}).`);
+    p.log.info('index metodu hazırda 501 qaytarır; TODO hissəsinə öz məntiqini əlavə et.');
+    return;
+  }
   const options = parseArgs(args);
   if (options.help) {
     console.log(`EXG — Express MVC Generator
@@ -133,6 +149,8 @@ export async function main(args = process.argv.slice(2)) {
   exg my-api                    ORM-i interaktiv seç
   exg my-api --orm prisma        Sual vermədən yarat
   exg my-api --orm mongoose --template ../express-mvc-starter
+  exg make:controller HomeController
+  exg make:controller HomeController --project ./my-api
 
 Seçimlər:
   --orm prisma|sequelize|mongoose

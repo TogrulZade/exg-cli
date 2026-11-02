@@ -65,7 +65,7 @@ export async function directory(dir) {
   }
 }
 
-function routeIndex(source, names) {
+export function routeIndex(source, names) {
   const tokens = [];
   const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', onToken: tokens });
   const exported = ast.body.find((node) => node.type === 'ExportDefaultDeclaration');

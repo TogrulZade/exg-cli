@@ -176,6 +176,105 @@ export class UserController {
 
 Controller yalnız sorğunu oxuyur və cavab qaytarır; data ilə iş service-də olur. Belə olduqda eyni məntiqi başqa controller-dən, admin paneldən və ya testdən də çağırmaq olur.
 
+## Request (validation) yaratmaq
+
+Laravel-dəki `make:request` (FormRequest) kimi:
+
+```bash
+exg make:request StoreProductRequest
+# və ya: exg make:request StoreProduct --project ./my-api
+```
+
+`src/requests/StoreProductRequest.js` yaranır. Qaydaları zod ilə yaz:
+
+```js
+export const StoreProductSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  price: z.coerce.number().positive(),
+  categoryIds: z.array(z.coerce.number().int().positive()).default([]),
+});
+
+export default validate(StoreProductSchema);
+```
+
+Router-də middleware kimi istifadə et:
+
+```js
+import StoreProductRequest from '../requests/StoreProductRequest.js';
+
+router.post('/', StoreProductRequest, ProductController.store);
+```
+
+Qaydalar ödənməsə controller-ə çatmadan `422` və sahə xətaları qaytarılır. Uğurlu olsa `req.body` təmizlənmiş datadır (`trim`, `coerce`, `default` tətbiq olunub). `z.object`-də yazılmayan sahələr `req.body`-dən silinir, ona görə qaydaları yazmadan istifadə etmə.
+
+`src/middlewares/validate.js` yoxdursa yaradılır. Layihədə `zod` olmalıdır. Mövcud faylın üzərinə yazılmır. Validation yalnız `req.body` üçündür.
+
+## Seeder yaratmaq (Prisma)
+
+Laravel-dəki `make:seeder` kimi:
+
+```bash
+exg make:seeder BrandSeeder
+# və ya: exg make:seeder Brand --project ./my-api
+```
+
+Əmr bunları edir:
+
+- `prisma/seeders/BrandSeeder.js` yaradır. `records` siyahısına data yaz, seeder hər birini `prisma.brand.upsert()` ilə yazır: `uniqueBy` sahəsinə (default `name`) görə yoxdursa yaradır, varsa toxunmur. Bu sahə schema-da `@unique` olmalıdır.
+- `prisma/seed.js` (Laravel-dəki `DatabaseSeeder`) faylında seeder-i import edir və `const seeders = [...]` siyahısının sonuna əlavə edir. Fayl yoxdursa yaradılır.
+- `package.json`-da yoxdursa `db:seed` script-i və `prisma.seed` ayarı əlavə olunur. Mövcud dəyərlərə toxunulmur.
+
+İşlətmək: `npm run db:seed`. `npx prisma migrate reset` (Laravel-dəki `migrate:fresh --seed`) də sonda seed işlədir, amma bazadakı bütün datanı silir.
+
+Seeder-lər `seeders` siyahısındakı sırayla işləyir: əlaqəli modellər (məsələn `Product` → `Brand`) asılı olduqları modeldən sonra gəlməlidir. Seeder-i təkrar işlətmək təhlükəsizdir, dublikat yaranmır. Modelin unikal sahəsi `name` deyilsə (məsələn `email`, `slug`), `uniqueBy` dəyərini dəyiş.
+
+Mövcud seeder faylının üzərinə yazılmır. `seed.js` gözlənilən quruluşda deyilsə heç bir fayl dəyişdirilmədən xəta verilir. Sequelize və Mongoose şablonları üçün hələ dəstəklənmir.
+
+## JWT authentication quraşdırmaq (Prisma)
+
+```bash
+exg install:jwt
+# və ya: exg install:jwt --project ./my-api
+```
+
+Sonra:
+
+```bash
+npm install
+npm run db:migrate -- --name add_user_password
+```
+
+Hazır endpoint-lər:
+
+| Endpoint | Nə edir |
+|---|---|
+| `POST /api/auth/register` | `{ name, email, password }` → istifadəçi yaradır, `{ user, token }` qaytarır |
+| `POST /api/auth/login` | `{ email, password }` → `{ user, token }` |
+| `GET /api/auth/me` | Token sahibini qaytarır |
+
+Route qorumaq üçün `requireAuth` middleware-ini əlavə et; daxil olan istifadəçi `req.user`-dədir:
+
+```js
+import { requireAuth } from '../middlewares/auth.js';
+
+router.post('/', requireAuth, ProductController.store);
+```
+
+Sorğularda token header kimi göndərilir: `Authorization: Bearer <token>`.
+
+Əmr bunları edir:
+
+- Yaradır: `src/config/auth.js`, `src/services/AuthService.js`, `src/middlewares/auth.js`, `src/controllers/AuthController.js`, `src/routes/authRoutes.js`, `src/requests/RegisterRequest.js`, `src/requests/LoginRequest.js`, `test/auth.test.js` (və yoxdursa `src/middlewares/validate.js`).
+- `src/routes/index.js`-də `/auth` route-unu qoşur.
+- `User` modelinə `password String?` əlavə edir. Şifrə Node-un `scrypt` funksiyası ilə hash olunur.
+- `src/config/db.js`-də `new PrismaClient({ omit: { user: { password: true } } })` yazır: şifrə hash-i heç bir sorğuda (məsələn `findMany()`) qaytarılmır. Prisma 6.2-dən köhnə versiyalarda schema-ya `previewFeatures = ["omitApi"]` də əlavə olunur.
+- `.env`-ə təsadüfi `JWT_SECRET` və `JWT_EXPIRES_IN=1d`, `.env.example`-a boş nümunə yazır.
+- `package.json`-a `jsonwebtoken` əlavə edir.
+
+Mövcud faylların üzərinə yazılmır. Layihə gözlənilən quruluşda deyilsə (məsələn `db.js`-də tək `new PrismaClient()` yoxdursa və ya `User` modelində artıq `password` varsa) heç bir fayl dəyişdirilmədən xəta verilir. Sequelize və Mongoose şablonları hələ dəstəklənmir.
+
+Token 1 gün etibarlıdır və bu müddətdə ləğv edilmir (logout və refresh token yoxdur). Production-da login üçün rate limit (məsələn `express-rate-limit`) əlavə et.
+
 ## GitHub və npm-dən quraşdırma
 
 GitHub-dan quraşdırmaq üçün:

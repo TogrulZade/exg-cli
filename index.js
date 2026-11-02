@@ -11,6 +11,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { makeController, parseControllerArgs } from './src/make-controller.js';
 import { makeService, parseServiceArgs } from './src/make-service.js';
+import { makeSeeder, parseSeederArgs } from './src/make-seeder.js';
+import { installJwt, parseInstallArgs } from './src/install-jwt.js';
+import { makeRequest, parseRequestArgs } from './src/make-request.js';
 import { databaseConfig, promptDatabase, configureNewDatabase, databaseSteps } from './src/database.js';
 
 const execFileAsync = promisify(execFile);
@@ -171,6 +174,62 @@ User adı da UserService kimi qəbul edilir. Mövcud faylların üzərinə yazı
     p.log.info(`Controller-də istifadə: import { ${result.service} } from '../services/${result.service}.js';`);
     return;
   }
+  if (args[0] === 'make:seeder') {
+    const options = parseSeederArgs(args.slice(1));
+    if (options.help) {
+      console.log(`İstifadə: exg make:seeder BrandSeeder [--project ./my-api]
+
+prisma/seeders daxilində seeder yaradır və onu prisma/seed.js-də qeydiyyata alır.
+seed.js yoxdursa yaradılır; package.json-a db:seed script-i və prisma.seed əlavə olunur.
+Brand adı da BrandSeeder kimi qəbul edilir. Mövcud faylların üzərinə yazılmır. Yalnız Prisma layihələri.`);
+      return;
+    }
+    const result = await makeSeeder(options);
+    for (const file of result.files) p.log.success(file);
+    p.log.info(`records siyahısını doldur, sonra: npm run db:seed. uniqueBy sahəsi (default name) ${result.model} modelində @unique olmalıdır.`);
+    return;
+  }
+  if (args[0] === 'make:request') {
+    const options = parseRequestArgs(args.slice(1));
+    if (options.help) {
+      console.log(`İstifadə: exg make:request StoreProductRequest [--project ./my-api]
+
+Laravel-dəki FormRequest kimi src/requests daxilində zod qaydaları olan fayl yaradır.
+Default export router-də middleware kimi işlədilir; uğursuz validation 422 qaytarır.
+StoreProduct adı da StoreProductRequest kimi qəbul edilir. Mövcud faylların üzərinə yazılmır.`);
+      return;
+    }
+    const result = await makeRequest(options);
+    for (const file of result.files) p.log.success(file);
+    p.log.info(`Router-də: import ${result.request} from '../requests/${result.request}.js';`);
+    p.log.info(`           router.post('/', ${result.request}, Controller.store);`);
+    p.log.warn('Qaydaları yaz: z.object-də olmayan sahələr req.body-dən silinir.');
+    return;
+  }
+  if (args[0] === 'install:jwt') {
+    const options = parseInstallArgs(args.slice(1));
+    if (options.help) {
+      console.log(`İstifadə: exg install:jwt [--project ./my-api]
+
+Prisma layihəsinə JWT authentication quraşdırır:
+  POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
+  requireAuth middleware-i (src/middlewares/auth.js) route-ları qorumaq üçün.
+User modelinə password sahəsi əlavə olunur və o, bütün sorğulardan gizlədilir.
+Mövcud faylların üzərinə yazılmır; xəta olarsa heç nə dəyişdirilmir.`);
+      return;
+    }
+    const result = await installJwt(options);
+    for (const file of result.created) p.log.success(`yaradıldı: ${file}`);
+    for (const file of result.updated) p.log.success(`dəyişdirildi: ${file}`);
+    if (!result.envFiles.includes('.env')) p.log.warn('.env tapılmadı: JWT_SECRET-i (ən azı 32 simvol) özün əlavə et.');
+    p.note([
+      ...(result.added.length ? ['npm install'] : []),
+      'npm run db:migrate -- --name add_user_password',
+      'npm run dev',
+    ].join('\n'), 'Növbəti addımlar');
+    p.log.info("Route qorumaq: import { requireAuth } from '../middlewares/auth.js'; router.post('/', requireAuth, ...)");
+    return;
+  }
   const options = parseArgs(args);
   if (options.help) {
     console.log(`EXG — Express MVC Generator
@@ -185,6 +244,9 @@ User adı da UserService kimi qəbul edilir. Mövcud faylların üzərinə yazı
   exg make:controller HomeController
   exg make:controller HomeController --project ./my-api
   exg make:service UserService
+  exg make:seeder BrandSeeder
+  exg make:request StoreProductRequest
+  exg install:jwt
 
 Seçimlər:
   --orm prisma|sequelize|mongoose

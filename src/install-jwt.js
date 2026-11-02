@@ -3,6 +3,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { directory, projectRoot, routeIndex } from './make-controller.js';
 import * as templates from './templates/jwt.js';
+import { dbFile, usesSt } from './layout.js';
 
 const JWT_VERSION = '^9.0.3';
 const ZOD_VERSION = '^4.1.0';
@@ -24,7 +25,7 @@ export function parseInstallArgs(args) {
   return options;
 }
 
-async function readFileIfExists(file) {
+export async function readFileIfExists(file) {
   try {
     const stat = await fs.lstat(file);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Adi fayl olmalıdır: ${file}`);
@@ -35,7 +36,7 @@ async function readFileIfExists(file) {
   }
 }
 
-async function exists(file) {
+export async function exists(file) {
   return fs.lstat(file).then(() => true, (error) => {
     if (error.code === 'ENOENT') return false;
     throw error;
@@ -77,14 +78,14 @@ function findBlock(source, keyword, name) {
   return { start: header.index, bodyStart: header.index + header[0].length, end: close + 1 };
 }
 
-export function addPasswordField(source) {
+export function addPasswordField(source, { st = false } = {}) {
   const block = findBlock(source, 'model', 'User');
   if (!block) return null;
   const body = source.slice(block.bodyStart, block.end);
   if (/^\s*password\s/m.test(body)) throw new Error('User modelində artıq password sahəsi var. Əmr dəyişiklik etmədi.');
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   const email = /^([ \t]+)email(\s+)\S.*$/m.exec(body);
-  const comment = '// scrypt hash, never the plain password. Hidden from queries by the global omit in src/config/db.js.';
+  const comment = `// scrypt hash, never the plain password. Hidden from queries by the global omit in ${dbFile(st)}.`;
   if (email) {
     // Align with the email line: "  email     String ..." -> "  password  String?".
     const [line, indent, gap] = email;
@@ -114,11 +115,11 @@ export function addOmitPreview(source) {
   return source.slice(0, at) + `${newline}${provider[1]}previewFeatures = ["omitApi"]` + source.slice(at);
 }
 
-export function addGlobalOmit(source) {
-  if (/\bomit\s*:/.test(source)) throw new Error('src/config/db.js artıq omit ayarı istifadə edir. password-u əl ilə gizlət.');
+export function addGlobalOmit(source, { st = false } = {}) {
+  if (/\bomit\s*:/.test(source)) throw new Error(`${dbFile(st)} artıq omit ayarı istifadə edir. password-u əl ilə gizlət.`);
   const calls = source.match(/new PrismaClient\(\s*\)/g) ?? [];
   if (calls.length !== 1) {
-    throw new Error(`src/config/db.js daxilində tək "new PrismaClient()" gözlənilir. Əl ilə dəyiş: new PrismaClient(${OMIT})`);
+    throw new Error(`${dbFile(st)} daxilində tək "new PrismaClient()" gözlənilir. Əl ilə dəyiş: new PrismaClient(${OMIT})`);
   }
   return source.replace(/new PrismaClient\(\s*\)/, `new PrismaClient(${OMIT})`);
 }
@@ -131,7 +132,7 @@ export function addEnv(source, secret) {
     `JWT_SECRET=${secret}${newline}# How long a login token stays valid: 15m, 1h, 1d, 7d ...${newline}JWT_EXPIRES_IN=1d${newline}`;
 }
 
-async function replaceFile(file, content) {
+export async function replaceFile(file, content) {
   // Temp file + rename, so a crash never leaves a half-written file.
   const temp = path.join(path.dirname(file), `.exg-${process.pid}-${Date.now()}-${path.basename(file)}`);
   const mode = await fs.stat(file).then((stat) => stat.mode & 0o777, () => 0o644);
@@ -146,8 +147,14 @@ async function replaceFile(file, content) {
 
 export async function installJwt({ cwd = process.cwd(), project } = {}) {
   const root = await projectRoot(cwd, project);
-  for (const relative of ['src', 'src/config', 'src/controllers', 'src/middlewares', 'src/routes', 'src/services']) {
-    await directory(path.join(root, relative));
+  const st = await usesSt(root);
+  await directory(path.join(root, 'src'));
+  // The @st starter has no files in some of these folders yet, so they may not exist: create them.
+  const newDirs = [];
+  for (const relative of ['src/config', 'src/controllers', 'src/middlewares', 'src/routes', 'src/services']) {
+    const full = path.join(root, relative);
+    if (st && !await exists(full)) newDirs.push(full);
+    else await directory(full);
   }
   const requestsDir = path.join(root, 'src/requests');
   const requestsDirExisted = await exists(requestsDir);
@@ -162,14 +169,14 @@ export async function installJwt({ cwd = process.cwd(), project } = {}) {
   // Plan every change in memory first; nothing is written until all checks pass.
   const creates = [
     ['src/config/auth.js', templates.authConfig],
-    ['src/services/AuthService.js', templates.authService],
+    ['src/services/AuthService.js', templates.authServiceFor({ st })],
     ['src/middlewares/auth.js', templates.authMiddleware],
     ['src/controllers/AuthController.js', templates.authController],
     ['src/routes/authRoutes.js', templates.authRoutes],
-    ['src/requests/RegisterRequest.js', templates.registerRequest],
-    ['src/requests/LoginRequest.js', templates.loginRequest],
+    ['src/requests/RegisterRequest.js', templates.registerRequestFor({ st })],
+    ['src/requests/LoginRequest.js', templates.loginRequestFor({ st })],
   ];
-  if (!await exists(path.join(root, 'src/middlewares/validate.js'))) creates.push(['src/middlewares/validate.js', templates.validateMiddleware]);
+  if (!st && !await exists(path.join(root, 'src/middlewares/validate.js'))) creates.push(['src/middlewares/validate.js', templates.validateMiddleware]);
   if (await exists(path.join(root, 'test')) && !await exists(path.join(root, 'test/auth.test.js'))) creates.push(['test/auth.test.js', templates.authTest]);
   for (const [relative] of creates) {
     const file = path.join(root, relative);
@@ -193,7 +200,7 @@ export async function installJwt({ cwd = process.cwd(), project } = {}) {
   if (!await update('src/routes/index.js', (source) => routeIndex(source, { variable: 'authRoutes', routeFile: 'authRoutes.js', mount: '/auth' }))) {
     throw new Error('src/routes/index.js tapılmadı.');
   }
-  if (!await update('src/config/db.js', addGlobalOmit)) throw new Error('src/config/db.js tapılmadı.');
+  if (!await update(dbFile(st), (source) => addGlobalOmit(source, { st }))) throw new Error(`${dbFile(st)} tapılmadı.`);
 
   const files = await schemaFiles(root, pkg);
   let userFound = false;
@@ -203,7 +210,7 @@ export async function installJwt({ cwd = process.cwd(), project } = {}) {
     const relative = path.relative(root, file);
     await update(relative, (source) => {
       let result = source;
-      const withPassword = addPasswordField(result);
+      const withPassword = addPasswordField(result, { st });
       if (withPassword !== null) { userFound = true; result = withPassword; }
       if (preview) {
         const withPreview = addOmitPreview(result);
@@ -235,7 +242,8 @@ export async function installJwt({ cwd = process.cwd(), project } = {}) {
   const created = [];
   const replaced = [];
   try {
-    // Laravel-style FormRequest files live in src/requests (exg make:request adds more).
+    // Laravel-style FormRequest files live in src/requests (st make:request adds more).
+    for (const dir of newDirs) await fs.mkdir(dir);
     if (!requestsDirExisted) await fs.mkdir(requestsDir);
     for (const [relative, content] of creates) {
       const file = path.join(root, relative);
@@ -257,6 +265,7 @@ export async function installJwt({ cwd = process.cwd(), project } = {}) {
       if (await fs.readFile(item.file, 'utf8').catch(() => null) === item.content) await fs.unlink(item.file);
     }
     if (!requestsDirExisted) await fs.rmdir(requestsDir).catch(() => {});
+    for (const dir of newDirs.reverse()) await fs.rmdir(dir).catch(() => {});
     throw error;
   }
 
@@ -266,5 +275,6 @@ export async function installJwt({ cwd = process.cwd(), project } = {}) {
     updated: updates.map((item) => item.relative),
     envFiles,
     added,
+    st,
   };
 }

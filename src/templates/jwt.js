@@ -1,4 +1,4 @@
-// Files written by `exg install:jwt`. Kept here so the installer logic stays readable.
+// Files written by `st install:jwt`. Kept here so the installer logic stays readable.
 
 export const authConfig = `// Read on use (not at import) so tests and tools that never sign tokens don't need a secret.
 export function authConfig(env = process.env) {
@@ -10,13 +10,13 @@ export function authConfig(env = process.env) {
 }
 `;
 
-export const authService = `import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+export const authServiceFor = ({ st = false } = {}) => `import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import jwt from 'jsonwebtoken';
-import prisma from '../config/db.js';
+import prisma from '${st ? '@st/database' : '../config/db.js'}';
 import { authConfig } from '../config/auth.js';
 
-// The password hash is hidden from every query by the global \`omit\` in src/config/db.js.
+// The password hash is hidden from every query by the global \`omit\` in ${st ? 'src/@st/database/index.js' : 'src/config/db.js'}.
 // Only login asks for it explicitly with \`omit: { password: false }\`.
 
 const scryptAsync = promisify(scrypt);
@@ -133,8 +133,8 @@ export class AuthController {
 }
 `;
 
-export const registerRequest = `import { z } from 'zod';
-import { validate } from '../middlewares/validate.js';
+export const registerRequestFor = ({ st = false } = {}) => `import { z } from 'zod';
+import { validate } from '${st ? '@st/http' : '../middlewares/validate.js'}';
 
 // Laravel-dəki FormRequest kimi: POST /api/auth/register qaydaları.
 export const RegisterSchema = z.object({
@@ -147,8 +147,8 @@ export const RegisterSchema = z.object({
 export default validate(RegisterSchema);
 `;
 
-export const loginRequest = `import { z } from 'zod';
-import { validate } from '../middlewares/validate.js';
+export const loginRequestFor = ({ st = false } = {}) => `import { z } from 'zod';
+import { validate } from '${st ? '@st/http' : '../middlewares/validate.js'}';
 
 // Laravel-dəki FormRequest kimi: POST /api/auth/login qaydaları.
 export const LoginSchema = z.object({
@@ -215,3 +215,8 @@ test('a short or missing JWT_SECRET is refused', () => {
   assert.throws(() => authConfig({ JWT_SECRET: 'short' }), /JWT_SECRET/);
 });
 `;
+
+// Old-layout defaults, kept for existing imports.
+export const authService = authServiceFor();
+export const registerRequest = registerRequestFor();
+export const loginRequest = loginRequestFor();

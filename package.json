@@ -4,7 +4,7 @@
   "description": "Laravel-inspired Express.js MVC project generator",
   "type": "module",
   "bin": {
-    "exg": "index.js"
+    "st": "index.js"
   },
   "files": [
     "index.js",

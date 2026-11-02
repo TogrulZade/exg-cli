@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { usesSt } from './layout.js';
 import { isIP } from 'node:net';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -203,17 +204,19 @@ async function configureSequelize(directory, config, updateLock) {
     : `const config = { use_env_variable: 'DB_URI', dialect: '${spec.dialect}', logging: false };`;
   await fs.writeFile(path.join(directory, 'database/config.cjs'), `require('dotenv/config');\n${shared}\nmodule.exports = { development: config, test: config, production: config };\n`);
   if (config.database === 'sqlite') {
-    await fs.writeFile(path.join(directory, 'src/config/db.js'), `import { Sequelize } from 'sequelize';
+    // @st starter: the connection lives in the @st/database package and closes itself on shutdown.
+    const st = await usesSt(directory);
+    await fs.writeFile(path.join(directory, st ? 'src/@st/database/index.js' : 'src/config/db.js'), `import { Sequelize } from 'sequelize';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-
-const root = fileURLToPath(new URL('../../', import.meta.url));
+${st ? "import { onShutdown } from '@st/core';\n" : ''}
+const root = fileURLToPath(new URL('${st ? '../../../' : '../../'}', import.meta.url));
 const sequelize = new Sequelize({ dialect: 'sqlite', storage: path.resolve(root, process.env.DB_STORAGE || './dev.db'), logging: false });
 
 export default sequelize;
 export const connectDB = () => sequelize.authenticate();
 export const disconnectDB = () => sequelize.close();
-`);
+${st ? '\nonShutdown(disconnectDB);\n' : ''}`);
   }
   if (before !== JSON.stringify(pkg.dependencies)) {
     await fs.writeFile(pkgFile, `${JSON.stringify(pkg, null, 2)}\n`);
@@ -225,7 +228,7 @@ async function checkTemplatePaths(directory, config, orm) {
   const paths = ['.env.example', '.env', 'package.json', 'package-lock.json', '.gitignore', 'README.md', 'DATABASE.md'];
   if (orm === 'prisma') paths.push('prisma/schema.prisma', 'prisma/migrations/migration_lock.toml', 'prisma/migrations/20261028000000_create_users/migration.sql');
   if (orm === 'prisma' && config.database === 'sqlite') paths.push('scripts/prepare-sqlite.js');
-  if (orm === 'sequelize') paths.push('database/config.cjs', 'src/config/db.js');
+  if (orm === 'sequelize') paths.push('database/config.cjs', await usesSt(directory) ? 'src/@st/database/index.js' : 'src/config/db.js');
   if (config.database === 'sqlite') paths.push(path.join(orm === 'prisma' ? 'prisma' : '', config.file));
   for (const relative of paths) {
     let current = directory;

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { directory, projectRoot } from './make-controller.js';
 import { validateMiddleware } from './templates/jwt.js';
+import { usesSt } from './layout.js';
 
 export function parseRequestArgs(args) {
   const options = {};
@@ -34,9 +35,9 @@ export function requestNames(name) {
   return { request, schema: `${request.slice(0, -7)}Schema`, file: `src/requests/${request}.js` };
 }
 
-export function requestTemplate({ request, schema }) {
+export function requestTemplate({ request, schema }, { st = false } = {}) {
   return `import { z } from 'zod';
-import { validate } from '../middlewares/validate.js';
+import { validate } from '${st ? '@st/http' : '../middlewares/validate.js'}';
 
 // Laravel-dəki FormRequest kimi: bu sorğunun body qaydaları (rules) buradadır.
 // Router-də: router.post('/', ${request}, Controller.store);
@@ -68,7 +69,9 @@ export async function makeRequest({ name, cwd = process.cwd(), project }) {
     throw new Error('Bu əmr zod istifadə edir, amma package.json-da yoxdur. Əvvəlcə: npm install zod');
   }
   await directory(path.join(root, 'src'));
-  for (const relative of ['src/requests', 'src/middlewares']) {
+  // @st projects get validate() from @st/http, so no src/middlewares/validate.js is needed.
+  const st = await usesSt(root);
+  for (const relative of st ? ['src/requests'] : ['src/requests', 'src/middlewares']) {
     await fs.mkdir(path.join(root, relative)).catch((error) => { if (error.code !== 'EEXIST') throw error; });
     await directory(path.join(root, relative));
   }
@@ -78,8 +81,8 @@ export async function makeRequest({ name, cwd = process.cwd(), project }) {
     throw new Error(`${names.file} artıq mövcuddur; üzərinə yazılmadı.`);
   }
 
-  const outputs = [{ relative: names.file, content: requestTemplate(names) }];
-  if (!await exists(path.join(root, 'src/middlewares/validate.js'))) {
+  const outputs = [{ relative: names.file, content: requestTemplate(names, { st }) }];
+  if (!st && !await exists(path.join(root, 'src/middlewares/validate.js'))) {
     outputs.push({ relative: 'src/middlewares/validate.js', content: validateMiddleware });
   }
   const created = [];

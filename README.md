@@ -10,21 +10,21 @@ Node.js 22+ istifadə et. Şablonun lokal nüsxəsi üçün Git də lazımdır.
 cd exg-cli
 npm ci
 npm link
-exg --help
+st --help
 ```
 
-`npm link` bu qovluğu kompüterində `exg` əmrinə bağlayır. Kod dəyişəndə əmr həmin yeni kodu işlədir.
+`npm link` bu qovluğu kompüterində `st` əmrinə bağlayır. Kod dəyişəndə əmr həmin yeni kodu işlədir.
 
 ## İstifadə
 
 Yeni layihə yaratmaq üçün:
 
 ```bash
-exg
-exg my-api
-exg my-api --orm prisma
-exg another-api --orm sequelize
-exg mongo-api --orm mongoose
+st
+st my-api
+st my-api --orm prisma
+st another-api --orm sequelize
+st mongo-api --orm mongoose
 ```
 
 Terminalda layihə adından və ORM seçimindən sonra database sualları gəlir. `--orm prisma` versən, yalnız ORM sualı keçilir; baza məlumatları yenə soruşulur.
@@ -34,9 +34,9 @@ Ad kiçik latın hərfi və ya rəqəmlə başlamalıdır. Yalnız `a-z`, `0-9`,
 GitHub-a göndərmədən lokal şablonla işləmək üçün iki repozitoriyanın olduğu ana qovluqda:
 
 ```bash
-exg my-api --orm prisma --template ./express-mvc-starter
-exg sql-api --orm sequelize --template ./express-mvc-starter
-exg mongo-api --orm mongoose --template ./express-mvc-starter
+st my-api --orm prisma --template ./express-mvc-starter
+st sql-api --orm sequelize --template ./express-mvc-starter
+st mongo-api --orm mongoose --template ./express-mvc-starter
 ```
 
 Lokal seçim seçilmiş branch-in son commit-ini götürür. Şablondakı commit olunmamış dəyişikliklər, `.env`, `node_modules` və Git tarixçəsi yeni layihəyə köçürülmür. Şablonun hazırda açıq branch-i dəyişmir. Şablonda gizli faylları heç vaxt commit etmə.
@@ -48,7 +48,7 @@ Generator `package.json` və mövcuddursa `package-lock.json` içində ad və ve
 Məsələn, MySQL ilə Prisma layihəsi:
 
 ```bash
-exg shop-api --orm prisma --database mysql
+st shop-api --orm prisma --database mysql
 ```
 
 Suallarda Enter bassan bu dəyərlər götürülür. Host, port, istifadəçi, şifrə və baza adını özün dəyişə bilərsən.
@@ -73,13 +73,13 @@ Parametrləri birbaşa da verə bilərsən:
 
 ```bash
 # Portu və istifadəçini dəyiş; çatışmayan məlumatlar soruşulacaq
-exg shop-api --orm prisma --database mysql --db-port 3307 --db-user app_user
+st shop-api --orm prisma --database mysql --db-port 3307 --db-user app_user
 
 # Bütün sualları keç; şifrə boş, qalan sahələr standart olsun
-exg local-api --orm prisma --database sqlite --yes
+st local-api --orm prisma --database sqlite --yes
 
 # PostgreSQL bağlantısının parametrləri
-exg report-api --orm sequelize --database postgresql \
+st report-api --orm sequelize --database postgresql \
   --db-host localhost --db-port 5433 --db-user postgres --db-name reports --yes
 ```
 
@@ -114,13 +114,13 @@ Yaratdığın Express layihəsinin içində:
 
 ```bash
 cd my-api
-exg make:controller HomeController
+st make:controller HomeController
 ```
 
 Ana qovluqdan da işlədə bilərsən:
 
 ```bash
-exg make:controller HomeController --project ./my-api
+st make:controller HomeController --project ./my-api
 ```
 
 Əmr bunları hazırlayır:
@@ -131,7 +131,7 @@ exg make:controller HomeController --project ./my-api
 
 `index` daxilində TODO var və başlanğıcda `501 Not implemented` JSON cavabı verir; metodu boş saxlayıb sorğunu cavabsız qoymur. Həmin hissəyə öz kodunu yaz.
 
-`exg make:controller Home` də işləyir. `UserProfileController` üçün `userProfileRoutes.js` və `/user-profile` yaranır. Qovluqlu adlar (`Admin/HomeController`) dəstəklənmir.
+`st make:controller Home` də işləyir. `UserProfileController` üçün `userProfileRoutes.js` və `/user-profile` yaranır. Qovluqlu adlar (`Admin/HomeController`) dəstəklənmir.
 
 Mövcud faylların üzərinə yazılmır; eyni route yolu və import adı təkrar yaradılmır. Əmr ESM Express layihəsi və standart `Router()` + `export default router` quruluşu gözləyir. Standart quruluş tapılmazsa dəyişiklik etmədən xəta verir. Mövcud middleware və route sırası saxlanılır; yeni route default export-dan əvvəl qoşulur. Əsas router-də əvvəlcədən bütün yolları tutan 404/catch-all route varsa onun sırasını ayrıca nəzərə al.
 
@@ -142,8 +142,8 @@ Yalnız fayl yaradırsan, database əməliyyatı və migration işləmir. Lokal 
 Biznes məntiqini (database sorğuları, hesablamalar, cache) controller-dən ayırmaq üçün:
 
 ```bash
-exg make:service UserService
-# və ya: exg make:service User --project ./my-api
+st make:service UserService
+# və ya: st make:service User --project ./my-api
 ```
 
 `src/services/UserService.js` yaranır. `src/services` qovluğu yoxdursa yaradılır, mövcud faylın üzərinə yazılmır:
@@ -181,8 +181,8 @@ Controller yalnız sorğunu oxuyur və cavab qaytarır; data ilə iş service-d�
 Laravel-dəki `make:request` (FormRequest) kimi:
 
 ```bash
-exg make:request StoreProductRequest
-# və ya: exg make:request StoreProduct --project ./my-api
+st make:request StoreProductRequest
+# və ya: st make:request StoreProduct --project ./my-api
 ```
 
 `src/requests/StoreProductRequest.js` yaranır. Qaydaları zod ilə yaz:
@@ -207,15 +207,15 @@ router.post('/', StoreProductRequest, ProductController.store);
 
 Qaydalar ödənməsə controller-ə çatmadan `422` və sahə xətaları qaytarılır. Uğurlu olsa `req.body` təmizlənmiş datadır (`trim`, `coerce`, `default` tətbiq olunub). `z.object`-də yazılmayan sahələr `req.body`-dən silinir, ona görə qaydaları yazmadan istifadə etmə.
 
-`src/middlewares/validate.js` yoxdursa yaradılır. Layihədə `zod` olmalıdır. Mövcud faylın üzərinə yazılmır. Validation yalnız `req.body` üçündür.
+`validate` `@st/http` paketindən gəlir (köhnə strukturlu layihələrdə `src/middlewares/validate.js` yoxdursa yaradılır). Layihədə `zod` olmalıdır. Mövcud faylın üzərinə yazılmır. Validation yalnız `req.body` üçündür.
 
 ## Seeder yaratmaq (Prisma)
 
 Laravel-dəki `make:seeder` kimi:
 
 ```bash
-exg make:seeder BrandSeeder
-# və ya: exg make:seeder Brand --project ./my-api
+st make:seeder BrandSeeder
+# və ya: st make:seeder Brand --project ./my-api
 ```
 
 Əmr bunları edir:
@@ -230,11 +230,63 @@ Seeder-lər `seeders` siyahısındakı sırayla işləyir: əlaqəli modellər (
 
 Mövcud seeder faylının üzərinə yazılmır. `seed.js` gözlənilən quruluşda deyilsə heç bir fayl dəyişdirilmədən xəta verilir. Sequelize və Mongoose şablonları üçün hələ dəstəklənmir.
 
+## Queue və job (BullMQ + Redis)
+
+Laravel-dəki queue və `make:job` kimi:
+
+```bash
+st install:queue
+npm install
+st make:job SendWelcomeEmail
+```
+
+Redis işləməlidir (macOS: `brew install redis && brew services start redis`). Ünvan `.env`-dəki `REDIS_URL`-dən götürülür.
+
+Job yazmaq (`src/jobs/SendWelcomeEmail.js`, Laravel-dəki `handle()`):
+
+```js
+export default async function SendWelcomeEmail({ userId }, job) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  // email göndər...
+}
+```
+
+Göndərmək (Laravel-dəki `SendWelcomeEmail::dispatch(...)`):
+
+```js
+import { dispatch } from '@st/queue';
+import SendWelcomeEmail from '../jobs/SendWelcomeEmail.js';
+
+await dispatch(SendWelcomeEmail, { userId: user.id });
+await dispatch(SendWelcomeEmail, { userId: user.id }, { delay: 60_000 }); // 1 dəqiqə sonra
+```
+
+Worker-i işə salmaq (Laravel-dəki `php artisan queue:work`), server-dən ayrı terminalda:
+
+```bash
+npm run queue:dev    # development: fayl dəyişəndə yenidən başlayır
+npm run queue:work   # production
+```
+
+Əmrlər bunları edir:
+
+- `install:queue`: `src/@st/queue` paketini (`dispatch`, `startWorker`), `src/jobs/index.js` (job siyahısı) və `src/worker.js` yaradır; `package.json`-a `bullmq`, `ioredis`, `queue:work` və `queue:dev` əlavə edir; `REDIS_URL` yoxdursa `.env`-ə yazır. Queue shutdown zamanı özünü bağlayır (`@st/core`), `src/server.js` dəyişdirilmir. Sonra `npm install` işlət ki, `@st/queue` link olunsun.
+  Köhnə strukturlu layihələrdə (`src/@st` yoxdursa) əvvəlki kimi `src/queues/index.js` yaradılır və `src/server.js`-də shutdown-a `closeQueue()` qoşulur.
+- `make:job`: `src/jobs/<Ad>.js` yaradır və `src/jobs/index.js`-də qeydiyyata alır. Worker job-u funksiyanın adına görə tapır, ona görə funksiyanın adını dəyişmə.
+
+Davranış:
+
+- Xəta atan job 3 dəfəyə qədər yenidən cəhd edilir (5s, 10s, 20s). `dispatch`-in 3-cü arqumenti ilə dəyişmək olar: `{ attempts: 5 }`.
+- Queue bağlantısı ilk `dispatch`-da açılır: testlər və Redis-siz server normal başlayır. Redis 5 saniyədə cavab verməsə `dispatch` xəta atır (`QUEUE_DISPATCH_TIMEOUT_MS`).
+- Redis açarları layihənin adı ilə başlayır (`my-api:default:...`), ona görə bir neçə layihə eyni Redis-i paylaşa bilər (`QUEUE_PREFIX`, `QUEUE_NAME`).
+- Job-a bütöv obyekt yox, id göndər: data Redis-də JSON kimi saxlanılır, ən son datanı job-da bazadan oxu.
+- Worker `Ctrl+C`/`SIGTERM` alanda işləyən job-ların bitməsini gözləyib çıxır. `QUEUE_CONCURRENCY` (default 5) eyni vaxtda neçə job işlədiyini təyin edir.
+
 ## JWT authentication quraşdırmaq (Prisma)
 
 ```bash
-exg install:jwt
-# və ya: exg install:jwt --project ./my-api
+st install:jwt
+# və ya: st install:jwt --project ./my-api
 ```
 
 Sonra:
@@ -264,10 +316,10 @@ Sorğularda token header kimi göndərilir: `Authorization: Bearer <token>`.
 
 Əmr bunları edir:
 
-- Yaradır: `src/config/auth.js`, `src/services/AuthService.js`, `src/middlewares/auth.js`, `src/controllers/AuthController.js`, `src/routes/authRoutes.js`, `src/requests/RegisterRequest.js`, `src/requests/LoginRequest.js`, `test/auth.test.js` (və yoxdursa `src/middlewares/validate.js`).
+- Yaradır: `src/config/auth.js`, `src/services/AuthService.js`, `src/middlewares/auth.js`, `src/controllers/AuthController.js`, `src/routes/authRoutes.js`, `src/requests/RegisterRequest.js`, `src/requests/LoginRequest.js`, `test/auth.test.js`. Requests `validate`-i `@st/http`-dən götürür (köhnə strukturda yoxdursa `src/middlewares/validate.js` yaradılır).
 - `src/routes/index.js`-də `/auth` route-unu qoşur.
 - `User` modelinə `password String?` əlavə edir. Şifrə Node-un `scrypt` funksiyası ilə hash olunur.
-- `src/config/db.js`-də `new PrismaClient({ omit: { user: { password: true } } })` yazır: şifrə hash-i heç bir sorğuda (məsələn `findMany()`) qaytarılmır. Prisma 6.2-dən köhnə versiyalarda schema-ya `previewFeatures = ["omitApi"]` də əlavə olunur.
+- `src/@st/database/index.js`-də (köhnə strukturda `src/config/db.js`) `new PrismaClient({ omit: { user: { password: true } } })` yazır: şifrə hash-i heç bir sorğuda (məsələn `findMany()`) qaytarılmır. Prisma 6.2-dən köhnə versiyalarda schema-ya `previewFeatures = ["omitApi"]` də əlavə olunur.
 - `.env`-ə təsadüfi `JWT_SECRET` və `JWT_EXPIRES_IN=1d`, `.env.example`-a boş nümunə yazır.
 - `package.json`-a `jsonwebtoken` əlavə edir.
 

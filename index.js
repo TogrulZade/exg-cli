@@ -14,6 +14,8 @@ import { makeService, parseServiceArgs } from './src/make-service.js';
 import { makeSeeder, parseSeederArgs } from './src/make-seeder.js';
 import { installJwt, parseInstallArgs } from './src/install-jwt.js';
 import { makeRequest, parseRequestArgs } from './src/make-request.js';
+import { installQueue, parseQueueArgs } from './src/install-queue.js';
+import { makeJob, parseJobArgs } from './src/make-job.js';
 import { databaseConfig, promptDatabase, configureNewDatabase, databaseSteps } from './src/database.js';
 
 const execFileAsync = promisify(execFile);
@@ -148,7 +150,7 @@ export async function main(args = process.argv.slice(2)) {
   if (args[0] === 'make:controller') {
     const options = parseControllerArgs(args.slice(1));
     if (options.help) {
-      console.log(`İstifadə: exg make:controller HomeController [--project ./my-api]
+      console.log(`İstifadə: st make:controller HomeController [--project ./my-api]
 
 Controller-də index metodu, uyğun router və əsas router-də qeydiyyat yaradır.
 Home adı da HomeController kimi qəbul edilir. Mövcud faylların üzərinə yazılmır.`);
@@ -163,7 +165,7 @@ Home adı da HomeController kimi qəbul edilir. Mövcud faylların üzərinə ya
   if (args[0] === 'make:service') {
     const options = parseServiceArgs(args.slice(1));
     if (options.help) {
-      console.log(`İstifadə: exg make:service UserService [--project ./my-api]
+      console.log(`İstifadə: st make:service UserService [--project ./my-api]
 
 src/services daxilində static metodlu service class-ı yaradır.
 User adı da UserService kimi qəbul edilir. Mövcud faylların üzərinə yazılmır.`);
@@ -177,7 +179,7 @@ User adı da UserService kimi qəbul edilir. Mövcud faylların üzərinə yazı
   if (args[0] === 'make:seeder') {
     const options = parseSeederArgs(args.slice(1));
     if (options.help) {
-      console.log(`İstifadə: exg make:seeder BrandSeeder [--project ./my-api]
+      console.log(`İstifadə: st make:seeder BrandSeeder [--project ./my-api]
 
 prisma/seeders daxilində seeder yaradır və onu prisma/seed.js-də qeydiyyata alır.
 seed.js yoxdursa yaradılır; package.json-a db:seed script-i və prisma.seed əlavə olunur.
@@ -192,7 +194,7 @@ Brand adı da BrandSeeder kimi qəbul edilir. Mövcud faylların üzərinə yaz�
   if (args[0] === 'make:request') {
     const options = parseRequestArgs(args.slice(1));
     if (options.help) {
-      console.log(`İstifadə: exg make:request StoreProductRequest [--project ./my-api]
+      console.log(`İstifadə: st make:request StoreProductRequest [--project ./my-api]
 
 Laravel-dəki FormRequest kimi src/requests daxilində zod qaydaları olan fayl yaradır.
 Default export router-də middleware kimi işlədilir; uğursuz validation 422 qaytarır.
@@ -206,10 +208,53 @@ StoreProduct adı da StoreProductRequest kimi qəbul edilir. Mövcud faylların 
     p.log.warn('Qaydaları yaz: z.object-də olmayan sahələr req.body-dən silinir.');
     return;
   }
+  if (args[0] === 'install:queue') {
+    const options = parseQueueArgs(args.slice(1));
+    if (options.help) {
+      console.log(`İstifadə: st install:queue [--project ./my-api]
+
+BullMQ (Redis) queue quraşdırır, Laravel-dəki queue kimi:
+  src/@st/queue        @st/queue paketi: dispatch(Job, data), startWorker(jobs)
+                       (köhnə layihələrdə: src/queues/index.js)
+  src/jobs/index.js    job siyahısı (st make:job əlavə edir)
+  src/worker.js        npm run queue:work (Laravel: php artisan queue:work)
+Mövcud faylların üzərinə yazılmır; xəta olarsa heç nə dəyişdirilmir.`);
+      return;
+    }
+    const result = await installQueue(options);
+    for (const file of result.created) p.log.success(`yaradıldı: ${file}`);
+    for (const file of result.updated) p.log.success(`dəyişdirildi: ${file}`);
+    for (const warning of result.warnings) p.log.warn(warning);
+    p.note([
+      // @st projects always need npm install: it links the new @st/queue package.
+      ...(result.added.length || result.st ? ['npm install'] : []),
+      'st make:job SendWelcomeEmail',
+      'npm run dev          # bir terminalda',
+      'npm run queue:dev    # ikinci terminalda (worker)',
+    ].join('\n'), 'Növbəti addımlar');
+    p.log.info('Redis işləməlidir (macOS: brew install redis && brew services start redis).');
+    return;
+  }
+  if (args[0] === 'make:job') {
+    const options = parseJobArgs(args.slice(1));
+    if (options.help) {
+      console.log(`İstifadə: st make:job SendWelcomeEmail [--project ./my-api]
+
+src/jobs daxilində job yaradır və src/jobs/index.js siyahısına əlavə edir.
+Əvvəlcə st install:queue lazımdır. Mövcud faylların üzərinə yazılmır.`);
+      return;
+    }
+    const result = await makeJob(options);
+    for (const file of result.files) p.log.success(file);
+    p.log.info(`Göndərmək: import { dispatch } from '${result.st ? '@st/queue' : '../queues/index.js'}';`);
+    p.log.info(`           import ${result.job} from '../jobs/${result.job}.js';`);
+    p.log.info(`           await dispatch(${result.job}, { userId: user.id });`);
+    return;
+  }
   if (args[0] === 'install:jwt') {
     const options = parseInstallArgs(args.slice(1));
     if (options.help) {
-      console.log(`İstifadə: exg install:jwt [--project ./my-api]
+      console.log(`İstifadə: st install:jwt [--project ./my-api]
 
 Prisma layihəsinə JWT authentication quraşdırır:
   POST /api/auth/register, POST /api/auth/login, GET /api/auth/me
@@ -235,18 +280,20 @@ Mövcud faylların üzərinə yazılmır; xəta olarsa heç nə dəyişdirilmir.
     console.log(`EXG — Express MVC Generator
 
 İstifadə:
-  exg                           İnteraktiv seçim
-  exg my-api                    ORM və database-i interaktiv seç
-  exg my-api --orm prisma        Database bağlantısını interaktiv qur
-  exg my-api --orm prisma --database mysql
-  exg local-api --database sqlite --yes
-  exg my-api --orm mongoose --template ../express-mvc-starter
-  exg make:controller HomeController
-  exg make:controller HomeController --project ./my-api
-  exg make:service UserService
-  exg make:seeder BrandSeeder
-  exg make:request StoreProductRequest
-  exg install:jwt
+  st                            İnteraktiv seçim
+  st my-api                     ORM və database-i interaktiv seç
+  st my-api --orm prisma        Database bağlantısını interaktiv qur
+  st my-api --orm prisma --database mysql
+  st local-api --database sqlite --yes
+  st my-api --orm mongoose --template ../express-mvc-starter
+  st make:controller HomeController
+  st make:controller HomeController --project ./my-api
+  st make:service UserService
+  st make:seeder BrandSeeder
+  st make:request StoreProductRequest
+  st install:jwt
+  st install:queue
+  st make:job SendWelcomeEmail
 
 Seçimlər:
   --orm prisma|sequelize|mongoose
@@ -269,7 +316,7 @@ Node.js 22+ tələb olunur; lokal şablon seçimi üçün Git də lazımdır.`);
   }
   const interactive = !options.yes && Boolean(process.stdin.isTTY && process.stdout.isTTY);
   if ((!options.name || !options.orm) && !interactive) {
-    throw new Error('İnteraktiv terminal yoxdur. Məsələn: exg my-api --orm prisma');
+    throw new Error('İnteraktiv terminal yoxdur. Məsələn: st my-api --orm prisma');
   }
 
   p.intro(pc.bgCyan(pc.black(' EXG - Express MVC Generator ')));

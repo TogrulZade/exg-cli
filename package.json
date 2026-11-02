@@ -1,10 +1,10 @@
 {
   "name": "@togrulzade/exg",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Laravel-inspired Express.js MVC project generator",
   "type": "module",
   "bin": {
-    "exg": "./index.js"
+    "exg": "index.js"
   },
   "files": [
     "index.js",
